@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: SageComp
+## Notes: Raid composition helper for Conquest of Azeroth on Ascension
+## Author: CodeSage
+## Version: 0.1
+## SavedVariables: SageCompDB
+
+Data.lua
+Core.lua
