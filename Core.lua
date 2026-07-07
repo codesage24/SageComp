@@ -25,8 +25,9 @@ local function Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cff33ffccSageComp:|r " .. tostring(msg))
 end
 
-local function EnsureDB()
+function EnsureDB()
     SageCompDB = SageCompDB or {}
+    SageCompDB.minimap = SageCompDB.minimap or {}
     SageCompDB.specs = SageCompDB.specs or {}
     SageCompDB.point = SageCompDB.point or { point="CENTER", relativePoint="CENTER", x=0, y=0 }
     SageCompDB.iconColumns = SageCompDB.iconColumns or DEFAULT_ICON_COLUMNS
@@ -54,6 +55,16 @@ local function GetRosterUnits()
     end
 
     return units
+end
+
+local function GetClassColor(className)
+    local provider = SageComp.Providers and SageComp.Providers[className]
+
+    if provider and provider.color then
+        return provider.color
+    end
+
+    return { r = 0.85, g = 0.85, b = 0.85 }
 end
 
 local function SplitClassSpec(value)
@@ -309,16 +320,6 @@ local function SetIconColumns(count)
     if SageComp.Refresh then
         SageComp:Refresh()
     end
-end
-
-local function GetClassColor(className)
-    local provider = SageComp.Providers and SageComp.Providers[className]
-
-    if provider and provider.color then
-        return provider.color
-    end
-
-    return { r = 0.85, g = 0.85, b = 0.85 }
 end
 
 local function ToHexColor(color)

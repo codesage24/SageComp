@@ -7,3 +7,4 @@
 
 Data.lua
 Core.lua
+MinimapButton.lua
