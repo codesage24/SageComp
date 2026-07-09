@@ -4,6 +4,7 @@ SC.minimapButton = nil
 
 local BUTTON_SIZE = 31
 local DEFAULT_ANGLE = 225
+local ICON = "Interface\\Icons\\INV_Misc_Map_01"
 
 local minimapShapes = {
     ["ROUND"] = { true, true, true, true },
@@ -181,7 +182,7 @@ function SC:CreateMinimapButton()
     local icon = button:CreateTexture(nil, "BACKGROUND")
     icon:SetWidth(20)
     icon:SetHeight(20)
-    icon:SetTexture("Interface\\Icons\\INV_Misc_Spyglass_02")
+    icon:SetTexture(ICON)
     icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
     icon:SetPoint("TOPLEFT", button, "TOPLEFT", 7, -5)
 

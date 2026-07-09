@@ -11,7 +11,7 @@ local DEFAULT_ICON_COLUMNS = 4
 local MIN_ICON_COLUMNS = 2
 local MAX_ICON_COLUMNS = 8
 local ROW_HEIGHT = 16
-local MAX_MEMBER_ROWS = 40
+local MAX_MEMBER_ROWS = 48
 
 local function Normalize(value)
     value = value or ""
@@ -29,13 +29,28 @@ function EnsureDB()
     SageCompDB = SageCompDB or {}
     SageCompDB.minimap = SageCompDB.minimap or {}
     SageCompDB.specs = SageCompDB.specs or {}
-    SageCompDB.point = SageCompDB.point or { point="CENTER", relativePoint="CENTER", x=0, y=0 }
+    SageCompDB.point = SageCompDB.point or {
+        point = "CENTER",
+        relativePoint = "CENTER",
+        x = 0,
+        y = 0
+    }
+
     SageCompDB.iconColumns = SageCompDB.iconColumns or DEFAULT_ICON_COLUMNS
 
-    if SageCompDB.iconColumns < MIN_ICON_COLUMNS then SageCompDB.iconColumns = MIN_ICON_COLUMNS end
-    if SageCompDB.iconColumns > MAX_ICON_COLUMNS then SageCompDB.iconColumns = MAX_ICON_COLUMNS end
+    if SageCompDB.iconColumns < MIN_ICON_COLUMNS then
+        SageCompDB.iconColumns = MIN_ICON_COLUMNS
+    end
+
+    if SageCompDB.iconColumns > MAX_ICON_COLUMNS then
+        SageCompDB.iconColumns = MAX_ICON_COLUMNS
+    end
 
     return SageCompDB
+end
+
+function SageComp:EnsureDB()
+    return EnsureDB()
 end
 
 local function GetRosterUnits()
@@ -130,16 +145,44 @@ end
 
 local function GetRosterPlayers()
     local players = {}
-    local units = GetRosterUnits()
+    local units = GetRosterUnits() or {}
+
+    local rolePriority = {
+        Tank = 1,
+        Healer = 2,
+        Support = 3,
+        DPS = 4,
+        Unassigned = 5,
+    }
 
     for _, unit in ipairs(units) do
         local player = GetPlayerInfo(unit)
+
         if player then
+            player.sortRole =
+                player.role or "Unassigned"
+
             table.insert(players, player)
         end
     end
 
-    table.sort(players, function(a, b) return a.name < b.name end)
+    table.sort(players, function(a, b)
+        local aPriority =
+            rolePriority[a.sortRole]
+            or rolePriority.Unassigned
+
+        local bPriority =
+            rolePriority[b.sortRole]
+            or rolePriority.Unassigned
+
+        if aPriority ~= bPriority then
+            return aPriority < bPriority
+        end
+
+        return string.lower(a.name or "")
+            < string.lower(b.name or "")
+    end)
+
     return players
 end
 
@@ -404,34 +447,150 @@ function SageComp:LayoutBuffButtons()
 end
 
 function SageComp:RefreshRoster()
-    local players = GetRosterPlayers()
-    local counts = { Tank = 0, Healer = 0, Support = 0, DPS = 0 }
+    local players = GetRosterPlayers() or {}
 
-    for i, player in ipairs(players) do
-        if player.role and counts[player.role] ~= nil then
-            counts[player.role] = counts[player.role] + 1
+    local roleOrder = {
+        "Unassigned",    
+        "Tank",
+        "Healer",
+        "Support",
+        "DPS",
+    }
+
+    local roleHeaderNames = {
+        Unassigned = "Unassigned",    
+        Tank = "Tanks",
+        Healer = "Healers",
+        Support = "Supports",
+        DPS = "DPS",
+    }
+
+    local counts = {
+        Unassigned = 0,    
+        Tank = 0,
+        Healer = 0,
+        Support = 0,
+        DPS = 0,
+    }
+
+    local groupedPlayers = {
+        Unassigned = {},
+        Tank = {},
+        Healer = {},
+        Support = {},
+        DPS = {},
+    }
+
+    -------------------------------------------------
+    -- Group players by role
+    -------------------------------------------------
+    for _, player in ipairs(players) do
+        local role = player.role or "Unassigned"
+
+        if not groupedPlayers[role] then
+            role = "Unassigned"
         end
 
-        local row = self.memberRows and self.memberRows[i]
-        if row then
-            row.player = player
-            row.text:SetText(player.display)
-            local color = GetClassColor(player.className)
-            row.text:SetTextColor(color.r, color.g, color.b)
-            row:Show()
+        counts[role] = counts[role] + 1
+        table.insert(groupedPlayers[role], player)
+    end
+
+    local rowIndex = 1
+
+    -------------------------------------------------
+    -- Render role groups
+    -------------------------------------------------
+    for _, role in ipairs(roleOrder) do
+        local rolePlayers = groupedPlayers[role] or {}
+
+        if #rolePlayers > 0 then
+
+            -------------------------------------------------
+            -- Role header
+            -------------------------------------------------
+            local headerRow = self.memberRows
+                and self.memberRows[rowIndex]
+
+            if headerRow then
+                headerRow.player = nil
+                headerRow.isHeader = true
+
+                local headerName =
+                    roleHeaderNames[role] or role
+
+                headerRow.text:SetText(
+                    headerName
+                    .. " ("
+                    .. #rolePlayers
+                    .. ")"
+                )
+
+                headerRow.text:SetTextColor(
+                    1.0,
+                    0.82,
+                    0.20
+                )
+
+                headerRow:Show()
+
+                rowIndex = rowIndex + 1
+            end
+
+            -------------------------------------------------
+            -- Players
+            -------------------------------------------------
+            for _, player in ipairs(rolePlayers) do
+                local row = self.memberRows
+                    and self.memberRows[rowIndex]
+
+                if row then
+                    row.player = player
+                    row.isHeader = false
+
+                    row.text:SetText(player.display)
+
+                    local color =
+                        GetClassColor(player.className)
+
+                    row.text:SetTextColor(
+                        color.r,
+                        color.g,
+                        color.b
+                    )
+
+                    row:Show()
+
+                    rowIndex = rowIndex + 1
+                end
+            end
         end
     end
 
-    for i = #players + 1, MAX_MEMBER_ROWS do
-        local row = self.memberRows and self.memberRows[i]
+    -------------------------------------------------
+    -- Hide unused rows
+    -------------------------------------------------
+    for i = rowIndex, MAX_MEMBER_ROWS do
+        local row = self.memberRows
+            and self.memberRows[i]
+
         if row then
             row.player = nil
+            row.isHeader = false
+            row.text:SetText("")
             row:Hide()
         end
     end
 
+    -------------------------------------------------
+    -- Summary counts
+    -------------------------------------------------
     if self.countText then
-        self.countText:SetText("Tanks: " .. counts.Tank .. "  Healers: " .. counts.Healer .. "  Supports: " .. counts.Support .. "  DPS: " .. counts.DPS)
+        self.countText:SetText(
+            "Tanks: " .. counts.Tank
+            .. "  Healers: " .. counts.Healer
+            .. "  Supports: " .. counts.Support
+            .. "  DPS: " .. counts.DPS
+        )
     end
 end
 
@@ -599,19 +758,96 @@ function SageComp:CreateFrame()
 end
 
 local eventFrame = CreateFrame("Frame")
+
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
 eventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
+local wasInRaid = false
+
+local function IsCurrentlyInRaid()
+    return GetNumRaidMembers and GetNumRaidMembers() > 0
+end
+
+local function UpdateRaidFrameVisibility()
+    local isInRaid = IsCurrentlyInRaid()
+
+    -- Joined a raid or converted party -> raid
+    if isInRaid and not wasInRaid then
+        SageComp:ShowUI()
+
+    -- Left or disbanded raid
+    elseif not isInRaid and wasInRaid then
+        SageComp:HideUI()
+    end
+
+    wasInRaid = isInRaid
+end
+
+function SageComp:ShowUI()
+    if not self.frame then
+        self:CreateFrame()
+    end
+
+    self.frame:Show()
+
+    if self.Refresh then
+        self:Refresh()
+    end
+end
+
+function SageComp:HideUI()
+    if self.frame then
+        self.frame:Hide()
+    end
+end
+
+function SageComp:ToggleUI()
+    if not self.frame then
+        self:CreateFrame()
+    end
+
+    if self.frame:IsShown() then
+        self:HideUI()
+    else
+        self:ShowUI()
+    end
+end
+
 eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON then
         EnsureDB()
+
     elseif event == "PLAYER_LOGIN" then
         SageComp:CreateFrame()
-    else
-        if SageComp.Refresh then SageComp:Refresh() end
+
+        -- Always default hidden on login/reload.
+        SageComp.frame:Hide()
+
+        -- Record initial state without opening the frame.
+        -- This means reloading while already in a raid
+        -- does NOT automatically show the frame.
+        wasInRaid = IsCurrentlyInRaid()
+
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        -- Keep the frame hidden by default when zoning/loading.
+        -- Synchronize state so zoning does not count as "joining a raid".
+        wasInRaid = IsCurrentlyInRaid()
+
+        if SageComp.Refresh then
+            SageComp:Refresh()
+        end
+
+    elseif event == "PARTY_MEMBERS_CHANGED"
+        or event == "RAID_ROSTER_UPDATE" then
+
+        UpdateRaidFrameVisibility()
+
+        if SageComp.Refresh then
+            SageComp:Refresh()
+        end
     end
 end)
 
@@ -623,11 +859,11 @@ SlashCmdList["SAGECOMP"] = function(msg)
     command = Normalize(command)
 
     if command == "show" then
-        SageComp.frame:Show()
+        SageComp:ShowUI()
     elseif command == "hide" then
-        SageComp.frame:Hide()
+        SageComp:HideUI()
     elseif command == "toggle" or command == "" then
-        if SageComp.frame:IsShown() then SageComp.frame:Hide() else SageComp.frame:Show() end
+        SageComp:ToggleUI()
     elseif command == "spec" then
         local name, spec = string.match(rest, "^(%S+)%s+(.+)$")
         local className, specName = SplitClassSpec(spec)

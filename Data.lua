@@ -1,23 +1,5 @@
 SageComp = SageComp or {}
 
---[[
-    Providers are intentionally data-driven because CoA class/spec balance changes.
-
-    Accepted provider formats:
-      "ClassName"                  -> any player whose class matches
-      "ClassName:SpecName"         -> player must match class and saved/manual spec
-      "SpecName"                   -> player's saved/manual spec matches
-
-    Examples:
-      providers = { "Runemaster", "Chronomancer:Timeweaver", "Tinker:Medic" }
-
-    To teach the addon a player's CoA spec in game:
-      /sagecomp spec PlayerName ClassName:SpecName
-
-    Example:
-      /sagecomp spec Austin Chronomancer:Timeweaver
-]]
-
 SageComp.Providers = {
     ["Barbarian"] = {
         color = { r = 0.78, g = 0.31, b = 0.31 },
